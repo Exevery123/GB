@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Portal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    function App() {
+      const [illumHovered, setIllumHovered] = React.useState(false);
+
+      return (
+        <div style={{ display: 'flex', alignItems: 'flex-start', minHeight: '100vh' }}>
+          <img src="/images/portal_left_sidebar.png" style={{ height: '100vh', width: 'auto', flexShrink: 0 }} />
+          <img src="/images/clever_apps.png" style={{ height: 'auto', width: 'auto' }} />
+          <img
+            src="/images/illuminate_and_fastbridge.png"
+            onMouseEnter={() => setIllumHovered(true)}
+            onMouseLeave={() => setIllumHovered(false)}
+            onClick={() => window.location.replace('/illuminatehc')}
+            style={{
+              height: 'auto',
+              width: 'auto',
+              marginTop: '70px',
+              boxShadow: illumHovered ? '6px 6px 12px rgba(0,0,0,0.3)' : 'none',
+              transition: 'box-shadow 0.2s ease',
+            }}
+          />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

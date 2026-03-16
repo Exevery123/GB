@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clever</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; min-height: 100vh; background-color: #eef8fd; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    function App() {
+      return (
+        <>
+        <img src="/images/clever_logo_and_student.png" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100vh',
+          width: 'auto',
+        }} />
+        <div style={{
+          position: 'fixed',
+          left: '42%',
+          top: '45%',
+          transform: 'translate(-50%, -50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: '28px',
+        }}>
+          <h1 style={{
+            fontWeight: '700',
+            color: 'black',
+            fontFamily: "'Nunito Sans', sans-serif",
+            letterSpacing: 'normal',
+            fontSize: '3rem',
+            margin: 0,
+          }}>
+            Login
+          </h1>
+          <p style={{
+            fontWeight: '500',
+            color: 'black',
+            fontFamily: "'Nunito Sans', sans-serif",
+            fontSize: '1.65rem',
+            margin: 0,
+          }}>
+            Search for your school
+          </p>
+          <p style={{
+            fontWeight: '500',
+            color: '#555555',
+            fontFamily: "'Nunito Sans', sans-serif",
+            fontSize: '0.85rem',
+            margin: 0,
+          }}>
+            School Name
+          </p>
+          <input
+            type="text"
+            placeholder="Enter your School Name here"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target.value.trim() !== '') {
+                window.location.href = '/in/belmont-redwood-shores-sd46904140100000002/student/portal';
+              }
+            }}
+            style={{
+              marginTop: '5px',
+              padding: '10px 14px',
+              fontSize: '1rem',
+              fontFamily: "'Nunito Sans', sans-serif",
+              color: 'black',
+              backgroundColor: 'white',
+              border: '1px solid #cccccc',
+              borderRadius: '6px',
+              outline: 'none',
+              width: '320px',
+            }}
+          />
+        </div>
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
