@@ -72,12 +72,21 @@ const signedCoef = (g) => (g.sign === '-' ? rNeg(g.factors[0].coef) : g.factors[
 
 // ---------------------------------------------------------------- text
 
+/** The x part on its own. A negative power still reads as x, but underneath. */
 export function powerText(p) {
   if (p === 0) return ''
-  return p === 1 ? 'x' : `x^${p}`
+  const k = Math.abs(p)
+  return k === 1 ? 'x' : `x^${k}`
 }
 
 export function factorText(f) {
+  // A negative power puts x on the bottom, so 4/3 x^-1 reads as 4/(3x).
+  if (f.power < 0) {
+    const base = powerText(f.power)
+    const den = f.coef.d === 1 ? base : `${f.coef.d}${base}`
+    const sign = f.coef.n < 0 ? '-' : ''
+    return `${sign}${Math.abs(f.coef.n)}/${den.length > 1 ? `(${den})` : den}`
+  }
   const base = powerText(f.power)
   if (!base) return ratText(f.coef)
   if (rIsOne(f.coef)) return base
@@ -217,7 +226,13 @@ function parseNumber(s) {
   return rDiv(ratFromDecimal(parseFloat(m[1])), bottom)
 }
 
-/** Accepts "7", "-3", "x", "2x", "1.5", "3/4", "3/4x", "x^2", "2x^3". */
+/**
+ * Accepts "7", "-3", "x", "2x", "1.5", "3/4", "3/4x", "x^2", "2x^3", and a
+ * divisor written after the x rather than before it: "x/2", "3x/2", "x^2/3".
+ *
+ * A trailing divisor belongs to the coefficient, so "3x/2" and "3/2x" are the
+ * same thing - three halves of x, not three x's over something else.
+ */
 export function parseOperand(text) {
   let t = String(text).trim().replace(/\s+/g, '')
   if (!t) return null
@@ -227,25 +242,38 @@ export function parseOperand(text) {
     negative = true
     t = t.slice(1)
   }
-  let power = 0
-  let numPart = t
+
   const xi = t.indexOf('x')
-  if (xi >= 0) {
-    numPart = t.slice(0, xi)
-    const rest = t.slice(xi + 1)
-    power = 1
-    if (rest.startsWith('^')) {
-      const pv = rest.slice(1)
-      if (!/^\d+$/.test(pv)) return null
-      power = parseInt(pv, 10)
-    } else if (rest !== '') return null
+  if (xi < 0) {
+    const plain = parseNumber(t)
+    if (!plain) return null
+    return { coef: negative ? rNeg(plain) : plain, power: 0 }
   }
-  let coef
-  if (numPart === '') {
-    if (xi < 0) return null
-    coef = num(1)
-  } else {
-    coef = parseNumber(numPart)
+
+  // [number] x [^power] [/divisor]
+  const numPart = t.slice(0, xi)
+  let rest = t.slice(xi + 1)
+  let power = 1
+
+  if (rest.startsWith('^')) {
+    const digits = rest.slice(1).match(/^\d+/)
+    if (!digits) return null
+    power = parseInt(digits[0], 10)
+    rest = rest.slice(1 + digits[0].length)
+  }
+
+  let divisor = null
+  if (rest.startsWith('/')) {
+    divisor = parseNumber(rest.slice(1))
+    if (!divisor || rIsZero(divisor)) return null
+    rest = ''
+  }
+  if (rest !== '') return null
+
+  let coef = numPart === '' ? num(1) : parseNumber(numPart)
+  if (!coef) return null
+  if (divisor) {
+    coef = rDiv(coef, divisor)
     if (!coef) return null
   }
   return { coef: negative ? rNeg(coef) : coef, power }
@@ -351,16 +379,49 @@ export function randomEquation(rand = Math.random) {
   }
 }
 
+/**
+ * ax + b = c for the temple, where a, b and the answer are all single digits.
+ * The temple's keypad only has 1 to 9, so every number you have to *type* -
+ * b to take off, then a to divide by - has to be reachable on it.
+ */
+export function keypadEquation(rand = Math.random) {
+  const a = 2 + Math.floor(rand() * 8) // 2..9
+  const b = 1 + Math.floor(rand() * 9) // 1..9
+  const x = 1 + Math.floor(rand() * 9) // 1..9
+  return {
+    eq: { left: [varGroup(a), constGroup(b)], right: [constGroup(a * x + b)] },
+    answer: num(x),
+  }
+}
+
 /** The opening puzzle followed by three generated ones. */
 export function makePuzzles(rand = Math.random) {
   return [firstEquation(), randomEquation(rand), randomEquation(rand), randomEquation(rand)]
 }
 
+/**
+ * The bonus problem that closes the unit: 4/(3x) + 9 = 37, with x underneath.
+ * A power of -1 is what puts it there. Take 9 off both sides for 4/(3x) = 28,
+ * multiply both sides by x to bring it up as 4/3 = 28x, then divide by 28.
+ */
+export const bonusEquation = () => ({
+  eq: {
+    left: [makeGroup('+', [makeFactor(rat(4, 3), -1)]), constGroup(9)],
+    right: [constGroup(37)],
+  },
+  answer: rat(1, 21),
+})
+
 // ---------------------------------------------------------------- word problems
 
 /**
  * A word problem carries the units its numbers stand for, so the visualiser
- * can draw them. `perUnit` is how many pieces make one whole item.
+ * can draw them. `perUnit` is how many pieces make one whole item, and `piece`
+ * picks which counter gets drawn.
+ *
+ * The first problem hands the equation over. After that `sandbox` is set, so
+ * the student writes the equation themselves before solving it; `answer` is
+ * only kept here to document what the problem works out to.
  */
 export const WORD_PROBLEMS = [
   {
@@ -371,7 +432,92 @@ export const WORD_PROBLEMS = [
       'the end, he had 20 chocolate pieces left. How many chocolate bars did he ' +
       'start with?',
     perUnit: 4, // 4 pieces to a bar
-    given: true, // the equation is handed to the student for this first one
+    piece: 'chocolate',
     equation: () => ({ left: [varGroup(4), constGroup(7, '-')], right: [constGroup(20)] }),
+    answer: rat(27, 4),
+  },
+  {
+    id: 'chase',
+    text:
+      'Chase is playing for his baseball team. Dan scored 3 points, Ben scored ' +
+      '2 points, and Lance scored 7 points. However, according to Chase, his ' +
+      "score along with Ben's score is equal to Dan's and Lance's score " +
+      'combined. However, the referee said that Chase scored half of the points ' +
+      'he thought he scored. How many points did Chase actually score?',
+    perUnit: 3, // baseballs stack three at a time
+    piece: 'ball',
+    sandbox: true,
+    // x is what Chase really scored, so he thought he scored 2x: 2x + 2 = 3 + 7
+    answer: num(4),
+  },
+  {
+    id: 'michael',
+    text:
+      "Michael's machine makes lots and lots of rocks. Each second, he makes " +
+      'some rocks. However, when running his machine for a minute it breaks ' +
+      'down and he only gets half the rocks each second. And when he first ' +
+      'built his machine, he lost 100 rocks to build. He got 440 rocks after 5 ' +
+      'minutes. In the first minute, how many rocks did he get per second?',
+    perUnit: 3, // rocks stack three at a time
+    piece: 'rock',
+    sandbox: true,
+    // 60 seconds at x, then 240 seconds at x/2, less the 100 it cost to build:
+    // 60x + 120x - 100 = 440, so 180x = 540 and x = 3.
+    answer: num(3),
   },
 ]
+
+// ---------------------------------------------------------------- counters
+
+/**
+ * A count laid out as stacks of `perUnit` counters, for the picture version of
+ * an equation. Whole counters come first, then whatever fraction is left over
+ * as one part-filled counter on the end.
+ *
+ * The stacks belong to the number, not to the line: each one is drawn as a
+ * column, so a row of them never depends on where the text happens to wrap.
+ */
+export function counterStacks(value, perUnit) {
+  const whole = Math.floor(value.n / value.d)
+  const rest = value.n - whole * value.d
+  const parts = Array(whole).fill(1)
+  if (rest > 0) parts.push(rest / value.d)
+
+  const stacks = []
+  for (let i = 0; i < parts.length; i += perUnit) stacks.push(parts.slice(i, i + perUnit))
+  return stacks
+}
+
+// ---------------------------------------------------------------- stages
+
+/**
+ * The unit in order: four equations, the three word problems, then the bonus.
+ * Every stage carries the answer it is supposed to reach, so working that ends
+ * somewhere else can be turned away instead of quietly counting as a pass.
+ */
+export function makeStages(rand = Math.random) {
+  const puzzles = makePuzzles(rand)
+  const bonus = bonusEquation()
+  return [
+    ...puzzles.map((p, i) => ({
+      kind: 'equation',
+      label: `Equation ${i + 1} of ${puzzles.length}`,
+      eq: p.eq,
+      answer: p.answer,
+    })),
+    ...WORD_PROBLEMS.map((p, i) => ({
+      kind: p.sandbox ? 'sandbox' : 'word',
+      label: `Word problem ${i + 1} of ${WORD_PROBLEMS.length}`,
+      problem: p,
+      eq: p.equation ? p.equation() : null,
+      answer: p.answer,
+    })),
+    { kind: 'bonus', label: 'Bonus problem', eq: bonus.eq, answer: bonus.answer },
+  ]
+}
+
+/**
+ * Reaching "x = something" is not the same as being finished: in a sandbox
+ * problem a wrong equation solves perfectly well to the wrong number.
+ */
+export const isCorrect = (solved, answer) => solved !== null && !!answer && rEq(solved, answer)

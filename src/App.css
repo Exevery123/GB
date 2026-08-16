@@ -360,13 +360,17 @@
 .choc-run {
   display: inline-flex;
   flex-wrap: wrap;
-  align-items: center;
+  /* Stacks stand on a shared floor line, whatever height they reach. */
+  align-items: flex-end;
   gap: 0.35rem;
 }
 
-/* One bar: chocolate squares in a dark wrapper */
+/* One stack: counters piled UP, so a number reads as columns side by side
+   rather than a row that happens to wrap. column-reverse puts the first
+   counter at the bottom, so a part-filled leftover ends up on top. */
 .choc-bar {
   display: inline-flex;
+  flex-direction: column-reverse;
   gap: 3px;
   padding: 4px;
   background: #40240f;
@@ -551,4 +555,733 @@
 
 .op-input--wide {
   width: min(100%, 16rem);
+}
+
+/* An equation made of counters needs more room to breathe than numerals do. */
+.equation--counters {
+  gap: 0.75rem 1rem;
+  padding: 1.5rem 1.25rem;
+  line-height: 1.4;
+}
+
+.equation--counters .eq-side,
+.equation--counters .eq-group {
+  align-items: flex-end;
+}
+
+/* Apply and Reset share a row, so Reset never looks like an afterthought. */
+.op-row--wide {
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.op-row--wide .op-apply {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+.op-reset {
+  flex: 0 0 auto;
+}
+
+.unlock-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/* A wrong answer is a dead end: reset is the only way on. */
+.wrong-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  box-shadow:
+    inset -4px -4px 0 0 var(--shadow),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.12),
+    0 0 0 4px #ff5a5f;
+}
+
+/* ---------- Counters for the other word problems ---------- */
+
+/* Points are counted singly, so they get no wrapper of their own. */
+.choc-bar--ball {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.choc-piece--ball {
+  border-radius: 50%;
+  background: #e8e2d4;
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 255, 255, 0.3),
+    inset -3px -3px 0 rgba(0, 0, 0, 0.28),
+    0 0 0 2px #b0392f;
+}
+
+.choc-bar--rock {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.choc-piece--rock {
+  background: #7b7f88;
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 255, 255, 0.18),
+    inset -3px -3px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Chocolate pieces are oblong: two and a half times the width of a counter. */
+.choc-piece--chocolate {
+  width: 45px;
+}
+
+/* ---------- Part of a whole ---------- */
+
+/* A leftover counter is an empty outline with the fraction filled in from
+   the left, so 3/4 of a piece reads as three quarters of a piece. */
+.choc-piece--part {
+  position: relative;
+  overflow: hidden;
+  background: none;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+.choc-piece--part.choc-piece--ball {
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.4),
+    0 0 0 2px #b0392f;
+}
+
+.choc-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.choc-fill--chocolate {
+  background: #7b4a21;
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, 0.16);
+}
+
+.choc-fill--ball {
+  background: #e8e2d4;
+}
+
+.choc-fill--rock {
+  background: #7b7f88;
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* ---------- A picture over a picture, for x underneath ---------- */
+
+.choc-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.choc-frac-top {
+  padding: 0 0.4rem 0.35rem;
+}
+
+.choc-frac-bot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.4rem 0;
+  border-top: 3px solid #9aa3b8;
+}
+
+/* ---------- Hovering a picture tells you its number ---------- */
+
+/* Counting 440 rocks by eye is hopeless, so the term says what it is. */
+.choc-term[data-value],
+.choc-frac[data-value] {
+  position: relative;
+  cursor: help;
+}
+
+.choc-term[data-value]:hover::after,
+.choc-frac[data-value]:hover::after {
+  content: attr(data-value);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 20;
+  white-space: nowrap;
+  font-family: var(--pixel-font);
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.5rem 0.7rem;
+  color: var(--ink);
+  background: #0d0f14;
+  box-shadow: 0 0 0 3px var(--shadow);
+  pointer-events: none;
+}
+
+.choc-term[data-value]:hover,
+.choc-frac[data-value]:hover {
+  outline: 2px solid rgba(255, 205, 117, 0.55);
+  outline-offset: 3px;
+}
+
+/* Only ever seen if someone types an absurd number into the sandbox. */
+.choc-many {
+  font-family: var(--pixel-font);
+  font-size: clamp(0.7rem, 3vw, 1rem);
+  color: #9aa3b8;
+}
+
+/* ---------- Temples ---------- */
+
+.pixel-btn--temple {
+  background: #7a5cc6;
+  box-shadow:
+    inset -4px -4px 0 0 #4c3688,
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.25),
+    0 0 0 4px var(--shadow);
+}
+
+.pixel-btn--temple:active:not(:disabled) {
+  box-shadow:
+    inset 4px 4px 0 0 #4c3688,
+    inset -4px -4px 0 0 rgba(255, 255, 255, 0.15),
+    0 0 0 4px var(--shadow);
+}
+
+/* ---------- Stone Temple ---------- */
+
+.screen--game {
+  justify-content: flex-start;
+  padding-top: 6rem;
+  gap: 1.25rem;
+}
+
+.temple-stage {
+  position: relative;
+  width: min(100%, 960px);
+}
+
+.temple-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #0d0f14;
+  cursor: crosshair;
+  /* Keep the hand-drawn blocks crisp when the canvas is scaled up. */
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 4px var(--shadow);
+  touch-action: none;
+}
+
+/* The sign's words sit over the top of the view until they are clicked away. */
+.sign-banner {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.55rem, 2.4vw, 0.8rem);
+  line-height: 1.8;
+  color: var(--ink);
+  background: rgba(13, 15, 20, 0.92);
+  border: none;
+  border-radius: 0;
+  padding: 0.9rem 1.4rem;
+  cursor: pointer;
+  box-shadow: 0 0 0 4px var(--shadow);
+  max-width: 90%;
+}
+
+.sign-banner:hover {
+  background: rgba(30, 34, 43, 0.95);
+}
+
+/* ---------- Slots ---------- */
+
+.slot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: #4b5058;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow:
+    inset -3px -3px 0 0 #2b2f36,
+    inset 3px 3px 0 0 rgba(255, 255, 255, 0.16);
+}
+
+.slot:hover {
+  background: #5b616a;
+}
+
+.slot--on {
+  box-shadow:
+    inset -3px -3px 0 0 #2b2f36,
+    inset 3px 3px 0 0 rgba(255, 255, 255, 0.16),
+    0 0 0 3px #ffcd75;
+}
+
+.slot--held {
+  opacity: 0.55;
+  box-shadow:
+    inset -3px -3px 0 0 #2b2f36,
+    inset 3px 3px 0 0 rgba(255, 255, 255, 0.16),
+    0 0 0 3px #7fdcff;
+}
+
+/* The slot a dragged item is currently hovering over. */
+.slot--over {
+  background: #6b7280;
+  box-shadow:
+    inset -3px -3px 0 0 #2b2f36,
+    inset 3px 3px 0 0 rgba(255, 255, 255, 0.16),
+    0 0 0 3px #ffcd75;
+}
+
+.slot[draggable='true'] {
+  cursor: grab;
+}
+
+.slot[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.slot-icon {
+  width: 32px;
+  height: 32px;
+  display: block;
+  margin: 6px auto;
+  image-rendering: pixelated;
+}
+
+.slot-count {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.hotbar {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  padding: 8px;
+  margin-top: 0.75rem;
+  background: rgba(13, 15, 20, 0.85);
+  box-shadow: 0 0 0 4px var(--shadow);
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- Inventory ---------- */
+
+.inv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.inv-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--bg-panel);
+  box-shadow:
+    inset -4px -4px 0 0 var(--shadow),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.12),
+    0 0 0 4px var(--shadow);
+  max-width: 100%;
+  overflow: auto;
+}
+
+/* Armour column, portrait, acorn, then crafting pushed to the right. */
+.inv-top {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.inv-armor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inv-portrait {
+  width: 80px;
+  height: 192px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #2b2f36;
+  box-shadow: inset 3px 3px 0 0 rgba(0, 0, 0, 0.4);
+}
+
+.portrait-head {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  background: #e8b489;
+}
+
+.portrait-hair {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 12px;
+  background: #4a3524;
+}
+
+.portrait-eye {
+  position: absolute;
+  top: 20px;
+  width: 6px;
+  height: 8px;
+  background: #2b2f38;
+}
+
+.portrait-eye--l {
+  left: 9px;
+}
+
+.portrait-eye--r {
+  right: 9px;
+}
+
+.portrait-body {
+  width: 54px;
+  height: 46px;
+  background: #3f6fc4;
+}
+
+.inv-acorn {
+  align-self: end;
+}
+
+.inv-craft-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: end;
+}
+
+.inv-label {
+  font-family: var(--pixel-font);
+  font-size: 0.62rem;
+  color: var(--ink-dim);
+}
+
+.inv-craft {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 4px;
+}
+
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(9, auto);
+  gap: 4px;
+  justify-content: center;
+}
+
+/* The hotbar row sits apart from the 27 slots, the way it does in the world. */
+.inv-grid--hotbar {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 4px dashed rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- Hearts ---------- */
+
+/* Ten hearts sitting over the left half of the hotbar. */
+.hud-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.hearts {
+  display: flex;
+  gap: 3px;
+  align-self: flex-start;
+  margin-left: max(0px, calc(50% - 216px));
+}
+
+.heart {
+  width: 18px;
+  height: 18px;
+  /* A blocky heart: two square lobes over a stepped point. */
+  clip-path: polygon(
+    22% 0, 44% 0, 44% 16%, 56% 16%, 56% 0, 78% 0, 100% 0, 100% 44%,
+    78% 44%, 78% 62%, 61% 62%, 61% 80%, 39% 80%, 39% 62%, 22% 62%,
+    22% 44%, 0 44%, 0 0
+  );
+  background: #2b2f36;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.heart--full {
+  background: #ff4a4f;
+}
+
+/* Half a heart: red on the left, empty on the right. */
+.heart--half {
+  background: linear-gradient(to right, #ff4a4f 0 50%, #2b2f36 50% 100%);
+}
+
+/* ---------- Boss bar ---------- */
+
+.boss-bar {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(90%, 640px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  background: rgba(13, 15, 20, 0.85);
+  box-shadow: 0 0 0 4px var(--shadow);
+}
+
+.boss-name {
+  font-family: var(--pixel-font);
+  font-size: clamp(0.6rem, 2.6vw, 0.85rem);
+  color: #a9f7bf;
+}
+
+.boss-track {
+  width: 100%;
+  height: 18px;
+  background: #2b2f36;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.boss-fill {
+  display: block;
+  height: 100%;
+  background: #4fdc7a;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25);
+  transition: width 120ms steps(4, end);
+}
+
+/* ---------- Console keypad ---------- */
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: min(100%, 40rem);
+}
+
+/* The tablet panel wears its sign's colour. */
+.console-panel--red {
+  box-shadow:
+    inset -4px -4px 0 0 var(--shadow),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.12),
+    0 0 0 4px #c95151;
+}
+
+.console-panel--blue {
+  box-shadow:
+    inset -4px -4px 0 0 var(--shadow),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.12),
+    0 0 0 4px #5a7ec9;
+}
+
+.equation--console {
+  font-size: clamp(0.95rem, 4vw, 1.7rem);
+  padding: 1.1rem 1rem;
+}
+
+.pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pad-ops {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.pad-readout {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 11rem;
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  background: var(--bg);
+  font-family: var(--pixel-font);
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+.pad-op {
+  color: #ffcd75;
+  font-size: 1.1rem;
+}
+
+.pad-digits {
+  color: var(--ink);
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+
+/* What you have picked up so far, shown while you are still crossing the
+   room to fetch the rest of it. */
+.staged {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.staged-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  background: rgba(13, 15, 20, 0.88);
+  box-shadow: 0 0 0 3px var(--shadow);
+  font-family: var(--pixel-font);
+}
+
+.staged-chip--red {
+  box-shadow: 0 0 0 3px #c95151;
+}
+
+.staged-chip--blue {
+  box-shadow: 0 0 0 3px #5a7ec9;
+}
+
+.pad-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+/* ---------- Treasure ---------- */
+
+.loot-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.loot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.6rem, 2.6vw, 0.8rem);
+  color: var(--ink);
+  line-height: 1.8;
+}
+
+.loot-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.emerald-dot {
+  width: 14px;
+  height: 14px;
+  background: #2fbf6b;
+  box-shadow: inset 2px 2px 0 #63e39a;
+}
+
+/* ---------- Emerald purse and code box (home) ---------- */
+
+.purse {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--bg-panel);
+  box-shadow:
+    inset -4px -4px 0 0 var(--shadow),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.18),
+    0 0 0 4px var(--shadow);
+}
+
+.emerald-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.purse-count {
+  font-family: var(--pixel-font);
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.code-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.code-input {
+  width: 9rem;
+}
+
+.code-go {
+  padding: 0.85rem 1.1rem;
+  font-size: 0.7rem;
+}
+
+.code-note {
+  width: 100%;
+  text-align: center;
 }
