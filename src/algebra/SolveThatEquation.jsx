@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import BackButton from '../BackButton.jsx'
-import EquationView from './EquationView.jsx'
+import EquationBoard from './EquationBoard.jsx'
 import {
-  applyOperation, counterStacks, factorText, isCorrect, makeStages,
-  parseEquation, parseOperand, ratText, solvedValue,
+  counterStacks, factorText, isCorrect, makeStages, parseEquation, ratText,
+  solvedValue,
 } from './equation.js'
-
-const OPERATIONS = [
-  { kind: 'add', symbol: '+', label: 'Add' },
-  { kind: 'sub', symbol: '−', label: 'Subtract' },
-  { kind: 'mul', symbol: '×', label: 'Multiply' },
-  { kind: 'div', symbol: '÷', label: 'Divide' },
-]
 
 /** Only a safety net against a typed 9999x - every real problem is far under. */
 const MAX_COUNTERS = 1000
@@ -78,7 +71,9 @@ function Pieces({ value, perUnit, piece }) {
  * term says what number it is.
  */
 export function FactorCounters({ factor, perUnit, piece }) {
-  const { coef, power } = factor
+  const { coef } = factor
+  // Word problems are all in x, so that is the only power a picture can carry.
+  const power = factor.powers.x || 0
   // The number this picture stands for, for the hover.
   const label = factorText(factor)
 
@@ -109,71 +104,6 @@ export function FactorCounters({ factor, perUnit, piece }) {
 }
 
 // ---------------------------------------------------------------- board
-
-/** The equation plus its operation controls - shared by every stage. */
-function EquationBoard({ eq, setEq, onReset, canReset, renderFactor, className }) {
-  const [pending, setPending] = useState(null)
-  const [operand, setOperand] = useState('')
-  const [note, setNote] = useState('')
-
-  function apply() {
-    if (!pending) return setNote('Pick +, −, × or ÷ first')
-    const value = parseOperand(operand)
-    if (!value) return setNote('Type a number, like 7 (or 3/4, or x)')
-    if (pending === 'div' && value.coef.n === 0) return setNote('You cannot divide by zero')
-    setEq((prev) => applyOperation(prev, pending, value))
-    setOperand('')
-    setPending(null)
-    setNote('')
-  }
-
-  return (
-    <>
-      <EquationView eq={eq} setEq={setEq} renderFactor={renderFactor} className={className} />
-
-      <div className="panel op-panel">
-        <p className="op-hint">
-          Do the same thing to both sides. Drag terms to reorder them, and click a
-          sign to work it out.
-        </p>
-        <div className="op-row">
-          {OPERATIONS.map((op) => (
-            <button
-              type="button"
-              key={op.kind}
-              className={'op-btn' + (pending === op.kind ? ' op-btn--on' : '')}
-              title={op.label}
-              onClick={() => {
-                setPending(op.kind)
-                setNote('')
-              }}
-            >
-              {op.symbol}
-            </button>
-          ))}
-          <input
-            className="op-input"
-            value={operand}
-            placeholder={pending ? 'number' : 'pick one'}
-            onChange={(e) => setOperand(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && apply()}
-          />
-        </div>
-        <div className="op-row op-row--wide">
-          <button type="button" className="pixel-btn op-apply" onClick={apply}>
-            Do it to both sides
-          </button>
-          {canReset && (
-            <button type="button" className="pixel-btn pixel-btn--alt op-reset" onClick={onReset}>
-              Reset
-            </button>
-          )}
-        </div>
-        {note && <p className="op-note">{note}</p>}
-      </div>
-    </>
-  )
-}
 
 function Solved({ value, onNext, nextLabel, onReset, canReset }) {
   return (

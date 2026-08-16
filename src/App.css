@@ -319,9 +319,10 @@
   border-top: 2px solid currentColor;
 }
 
+/* A power belongs to its letter, so it takes that letter's colour. */
 .eq-pow {
   font-size: 0.55em;
-  color: #ff5a5f;
+  color: inherit;
   font-weight: 700;
   vertical-align: super;
   line-height: 0;
@@ -1284,4 +1285,336 @@
 .code-note {
   width: 100%;
   text-align: center;
+}
+
+/* ---------- More Variables ---------- */
+
+/*
+ * One colour per letter, so a term can be recognised before it is read. The
+ * pairs are deliberate: a stands in for x and b for y, which is the whole
+ * point of the problem they appear in.
+ */
+.eq-sym--x,
+.eq-sym--a {
+  color: #ff5a5f;
+}
+
+.eq-sym--y,
+.eq-sym--b {
+  color: #ffa930;
+}
+
+.eq-sym--c {
+  color: #f7e59a;
+}
+
+.eq-sym--d {
+  color: #8ee08a;
+}
+
+.eq-sym--e {
+  color: #55d6e0;
+}
+
+/* An operator that is only being shown, not offered. */
+.eq-op--flat {
+  font-family: var(--pixel-font);
+  font-size: inherit;
+  color: #9aa3b8;
+  padding: 0.25rem 0.35rem;
+  line-height: 1;
+}
+
+/* ---------- Brackets ---------- */
+
+.eq-paren {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.eq-bracket {
+  color: #9aa3b8;
+  font-size: 1.15em;
+}
+
+/* The bracket's own terms sit tighter than the ones outside it. */
+.eq-paren .eq-group {
+  padding: 0.15rem 0.25rem;
+}
+
+/* ---------- Substitution ---------- */
+
+/* A term holding the letter that is about to be replaced. */
+.eq-group--spot {
+  box-shadow: 0 0 0 2px #ffcd75;
+  animation: spot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes spot-pulse {
+  50% {
+    background: rgba(255, 205, 117, 0.16);
+  }
+}
+
+/* A finished equation, kept on the page because the next step needs it. */
+.chain-float {
+  font-size: clamp(0.85rem, 3.4vw, 1.5rem);
+  padding: 1rem 1.25rem;
+  opacity: 0.7;
+  animation: chain-rise 0.45s ease-out;
+}
+
+.chain-float--live {
+  opacity: 1;
+  cursor: grab;
+  box-shadow:
+    inset -4px -4px 0 0 var(--shadow),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.12),
+    0 0 0 4px #ffcd75;
+}
+
+.chain-float--live:active {
+  cursor: grabbing;
+}
+
+@keyframes chain-rise {
+  from {
+    transform: translateY(2.5rem);
+    opacity: 0;
+  }
+}
+
+/* ---------- The 10y that drops in ---------- */
+
+/*
+ * Falls from above the viewport into the gap it is about to occupy. The
+ * timing here has to match DROP_MS in MoreVariables.jsx, or the equation
+ * swaps over before the term has landed.
+ */
+.eq-drop {
+  animation: eq-drop 1.1s cubic-bezier(0.5, 0, 0.75, 1);
+}
+
+@keyframes eq-drop {
+  0% {
+    transform: translateY(-70vh);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  /* A small bounce, so it reads as landing rather than stopping. */
+  84% {
+    transform: translateY(-0.5rem);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Prompts and by-hand answers ---------- */
+
+.prompt-panel {
+  text-align: center;
+  padding: 1.25rem 1.5rem;
+  animation: chain-rise 0.35s ease-out;
+}
+
+.equation--static .eq-group {
+  cursor: default;
+}
+
+.by-hand-lhs {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.9rem, 3.5vw, 1.3rem);
+}
+
+/* ---------- Sand Temple ---------- */
+
+/*
+ * z has no colour of its own anywhere else in the game, so it borrows c's
+ * pastel yellow - which is what the block in the temple is painted with too.
+ */
+.eq-sym--z {
+  color: #f7e59a;
+}
+
+/* An empty socket on the inscription: a hole cut in the slab. */
+.sand-socket {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  padding: 0.1em 0.2em;
+  font-family: inherit;
+  font-size: inherit;
+  color: #6b5335;
+  background: #2a2016;
+  border: none;
+  border-radius: 0;
+  box-shadow: inset 3px 3px 0 0 rgba(0, 0, 0, 0.55);
+}
+
+/* Live only while there is something you could do to it. */
+.sand-socket--live {
+  cursor: pointer;
+  color: #e0c78f;
+  box-shadow:
+    inset 3px 3px 0 0 rgba(0, 0, 0, 0.55),
+    0 0 0 3px #ffcd75;
+  animation: spot-pulse 1.4s ease-in-out infinite;
+}
+
+.sand-socket--live:hover {
+  background: #3a2c1e;
+}
+
+.sand-socket--full {
+  background: transparent;
+  box-shadow: 0 0 0 3px #ffcd75;
+}
+
+/* The slab itself, and the copy of it that follows you once it locks. */
+.slab-panel .equation--slab,
+.slab-banner .equation--slab {
+  font-size: clamp(0.85rem, 3.4vw, 1.5rem);
+}
+
+.slab-panel {
+  text-align: center;
+  border-top: 4px solid #6b5335;
+}
+
+.slab-banner {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(13, 15, 20, 0.92);
+  box-shadow: 0 0 0 4px var(--shadow);
+  max-width: 92%;
+}
+
+.slab-ask {
+  font-family: var(--pixel-font);
+  font-size: clamp(0.55rem, 2.4vw, 0.8rem);
+  color: var(--ink);
+}
+
+/* What is currently on your shoulder, bottom left of the view. */
+.carry-tag {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 5;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.5rem, 2.2vw, 0.75rem);
+  color: var(--ink);
+  background: rgba(13, 15, 20, 0.92);
+  padding: 0.6rem 0.9rem;
+  box-shadow: 0 0 0 4px var(--shadow);
+}
+
+.sphinx-panel {
+  text-align: center;
+  border-top: 4px solid #c9a86a;
+}
+
+/* Her one line, which never changes however far along you are. */
+.sphinx-line {
+  font-family: var(--pixel-font);
+  font-size: clamp(0.7rem, 3vw, 1.1rem);
+  line-height: 1.8;
+  color: #e0c78f;
+  margin: 0 0 1rem;
+}
+
+/* ---------- The dock ---------- */
+
+/*
+ * Anything you can work at - a slab, the Sphinx - is pinned to the bottom of
+ * the window rather than laid out under the canvas. Below a 560px canvas it
+ * was off the bottom of most screens, so walking up to an inscription looked
+ * like it had done nothing at all.
+ */
+.temple-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(100%, 48rem);
+  max-height: 68vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.75rem 1rem;
+  background: rgba(13, 15, 20, 0.95);
+  box-shadow: 0 -4px 0 0 var(--shadow);
+}
+
+.temple-dock > * {
+  width: 100%;
+}
+
+/* ---------- The eyes ---------- */
+
+/* One bar per eye, stacked. They are all called Eye and none of them is
+   numbered, so the only thing telling them apart is which one is emptying. */
+.boss-stack {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: center;
+  width: 100%;
+}
+
+.boss-stack .boss-bar {
+  position: static;
+  transform: none;
+}
+
+/* Black for as long as killing one only buys you ten seconds. It goes back to
+   the usual colour the moment they can be put down for good. */
+.boss-fill--dark {
+  background: #16181f;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+/* A slab term behaves exactly as if it were not wrapped at all. */
+.eq-part {
+  display: contents;
+}
+
+/* The banner and the carry tag both sit over a canvas that already has a
+   heads-up display along the bottom, so they keep clear of it. */
+.carry-tag {
+  bottom: 4.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eq-drop,
+  .chain-float,
+  .prompt-panel,
+  .eq-group--spot,
+  .sand-socket--live {
+    animation: none;
+  }
 }

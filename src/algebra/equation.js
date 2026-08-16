@@ -1,5 +1,5 @@
 /**
- * The equation model for "Solve that Equation!".
+ * The equation model for the algebra units.
  *
  * A side is a list of GROUPS joined by + / -. A group is a list of FACTORS
  * joined by * / /, so "3x * 5" is one group of two factors. Keeping multiplied
@@ -7,8 +7,13 @@
  * two groups can only be carried out once both have collapsed to one factor.
  *
  * Numbers are exact rationals, never floats, so a division shows as a tidy
- * simplified fraction instead of 6.999999. A factor also carries a POWER, so
- * x * x becomes x^2 and x^2 / x becomes x.
+ * simplified fraction instead of 6.999999. A factor also carries a map of
+ * LETTER -> POWER, so one factor can be `ce` or `a/c` as readily as `3x^2`.
+ * That map is what keeps the model from dead-ending: any two factors can
+ * always be multiplied or divided, because the powers simply add or subtract.
+ *
+ * A factor can instead be a PAREN, a bracketed sum held whole until it is
+ * multiplied out or until nothing is left holding it together.
  *
  * Everything here is pure, so the whole model is testable without a DOM.
  */
@@ -53,12 +58,57 @@ export const rEq = (a, b) => a.n === b.n && a.d === b.d
 /** "3", "-3", or "3/4" - already simplified by construction. */
 export const ratText = (r) => (r.d === 1 ? String(r.n) : `${r.n}/${r.d}`)
 
+// ---------------------------------------------------------------- symbols
+
+/**
+ * Every letter the game can put on screen, in the order they read inside a
+ * term - so the factor built from {e:1, c:1} always shows as `ce`, never `ec`,
+ * and two students who reach the same answer by different routes see the same
+ * thing on screen.
+ */
+export const SYMBOLS = ['x', 'y', 'z', 'a', 'b', 'c', 'd', 'e']
+const SYMBOL_ORDER = new Map(SYMBOLS.map((s, i) => [s, i]))
+
+/** Drop zero powers, so {x: 0} and {} are the same thing everywhere. */
+export function cleanPowers(powers) {
+  const out = {}
+  for (const s of SYMBOLS) if (powers[s]) out[s] = powers[s]
+  return out
+}
+
+/** The letters actually present, in reading order. */
+export const powerSymbols = (powers) =>
+  SYMBOLS.filter((s) => powers[s])
+
+/**
+ * A stable string for a set of powers, so like terms can be looked up and
+ * compared. `3x^2` and `-7x^2` share the key `x^2`; `ce` and `ec` share
+ * `c^1 e^1`.
+ */
+export const powersKey = (powers) =>
+  powerSymbols(powers).map((s) => `${s}^${powers[s]}`).join(' ')
+
 // ---------------------------------------------------------------- structure
 
-/** coef is a rational; power 0 is a plain number, 1 is x, 2 is x^2, ... */
-export function makeFactor(coef, power = 0) {
-  return { id: uid('f'), coef, power }
+/** coef is a rational; powers maps letters to their exponents. */
+export function makeTerm(coef, powers = {}) {
+  return { id: uid('f'), coef, powers: cleanPowers(powers) }
 }
+
+/**
+ * The single-letter shorthand the earlier units are written in: power 0 is a
+ * plain number, 1 is x, 2 is x^2, and a negative power puts x underneath.
+ */
+export function makeFactor(coef, power = 0, sym = 'x') {
+  return makeTerm(coef, power ? { [sym]: power } : {})
+}
+
+/** A bracketed sum, held whole until it is multiplied out or opened up. */
+export function makeParen(side) {
+  return { id: uid('p'), paren: side }
+}
+
+export const isParen = (f) => !!f.paren
 
 export function makeGroup(sign, factors, ops = []) {
   return { id: uid('g'), sign, factors, ops }
@@ -66,32 +116,54 @@ export function makeGroup(sign, factors, ops = []) {
 
 export const constGroup = (n, sign = '+') => makeGroup(sign, [makeFactor(num(n), 0)])
 export const varGroup = (n, sign = '+') => makeGroup(sign, [makeFactor(num(n), 1)])
+export const symGroup = (n, sym, sign = '+') =>
+  makeGroup(sign, [makeTerm(num(n), { [sym]: 1 })])
 
 /** The signed value of a single-factor group, e.g. "- 7" -> -7 */
 const signedCoef = (g) => (g.sign === '-' ? rNeg(g.factors[0].coef) : g.factors[0].coef)
 
+const flip = (sign) => (sign === '+' ? '-' : '+')
+
+/** A fresh copy, so a factor reused across several groups keeps a unique id. */
+const recopy = (f) => (isParen(f) ? makeParen(f.paren) : { ...f, id: uid('f') })
+
 // ---------------------------------------------------------------- text
 
-/** The x part on its own. A negative power still reads as x, but underneath. */
-export function powerText(p) {
-  if (p === 0) return ''
-  const k = Math.abs(p)
-  return k === 1 ? 'x' : `x^${k}`
+const symText = (sym, power) => (Math.abs(power) === 1 ? sym : `${sym}^${Math.abs(power)}`)
+
+/**
+ * A factor split into what sits above the line and what sits below it.
+ * Positive powers go on top, negative ones underneath, so `a/c` is one factor
+ * drawn as a fraction rather than two things waiting to be divided.
+ */
+export function factorParts(f) {
+  const top = []
+  const bot = []
+  for (const s of powerSymbols(f.powers)) (f.powers[s] > 0 ? top : bot).push(s)
+  return {
+    negative: f.coef.n < 0,
+    topNum: Math.abs(f.coef.n),
+    botNum: f.coef.d,
+    top,
+    bot,
+    // A lone number needs its digit; `x` does not need the 1 in front of it.
+    stacked: f.coef.d !== 1 || bot.length > 0,
+  }
 }
 
 export function factorText(f) {
-  // A negative power puts x on the bottom, so 4/3 x^-1 reads as 4/(3x).
-  if (f.power < 0) {
-    const base = powerText(f.power)
-    const den = f.coef.d === 1 ? base : `${f.coef.d}${base}`
-    const sign = f.coef.n < 0 ? '-' : ''
-    return `${sign}${Math.abs(f.coef.n)}/${den.length > 1 ? `(${den})` : den}`
+  if (isParen(f)) return `(${sideText(f.paren)})`
+  const p = factorParts(f)
+  const sign = p.negative ? '-' : ''
+  const half = (n, syms) => {
+    const body = syms.map((s) => symText(s, f.powers[s])).join('')
+    if (!body) return String(n)
+    return n === 1 ? body : `${n}${body}`
   }
-  const base = powerText(f.power)
-  if (!base) return ratText(f.coef)
-  if (rIsOne(f.coef)) return base
-  if (f.coef.n === -1 && f.coef.d === 1) return `-${base}`
-  return `${ratText(f.coef)}${base}`
+  const top = half(p.topNum, p.top)
+  if (!p.stacked) return sign + top
+  const bot = half(p.botNum, p.bot)
+  return `${sign}${top}/${bot.length > 1 ? `(${bot})` : bot}`
 }
 
 export function groupText(g, isFirst) {
@@ -112,62 +184,111 @@ export function canCombineFactors(g, i) {
   const a = g.factors[i]
   const b = g.factors[i + 1]
   if (!a || !b) return false
-  if (g.ops[i] === '*') return true // powers just add, so x * x is fine
-  if (g.ops[i] === '/') return !rIsZero(b.coef) // never divide by zero
+  // Two brackets multiplied together is not something these units ask for.
+  if (isParen(a) && isParen(b)) return false
+  // A bracket can be divided into but never divided BY - `3/(a+b)` has
+  // nowhere to go.
+  if (isParen(b)) return g.ops[i] === '*'
+  if (g.ops[i] === '*') return true // powers just add, so x * y is fine
+  if (g.ops[i] === '/') return isParen(a) || !rIsZero(b.coef) // never divide by zero
   return false
 }
-
-const flip = (sign) => (sign === '+' ? '-' : '+')
 
 /**
  * A group carries its sign separately from its coefficient, so once it has
  * collapsed to a single factor a negative coefficient has to be folded into
  * that sign - otherwise "-3x" divided by "-3" reads as "- -1x" instead of "x".
+ *
+ * A bracket keeps its own signs inside, so it is left alone.
  */
 function normalizeGroup(g) {
   if (g.factors.length !== 1) return g
   const f = g.factors[0]
-  if (rSign(f.coef) >= 0) return g
-  return { ...g, sign: flip(g.sign), factors: [makeFactor(rAbs(f.coef), f.power)] }
+  if (isParen(f) || rSign(f.coef) >= 0) return g
+  return { ...g, sign: flip(g.sign), factors: [makeTerm(rAbs(f.coef), f.powers)] }
+}
+
+/** Push `* k` or `/ k` onto every term inside a bracket. */
+function pushIntoParen(p, op, factor, front = false) {
+  return makeParen(
+    p.paren.map((g) => ({
+      ...g,
+      factors: front ? [recopy(factor), ...g.factors] : [...g.factors, recopy(factor)],
+      ops: front ? [op, ...g.ops] : [...g.ops, op],
+    })),
+  )
 }
 
 export function combineFactors(g, i) {
   if (!canCombineFactors(g, i)) return g
   const a = g.factors[i]
   const b = g.factors[i + 1]
-  const mul = g.ops[i] === '*'
-  const coef = mul ? rMul(a.coef, b.coef) : rDiv(a.coef, b.coef)
-  const power = mul ? a.power + b.power : a.power - b.power
+  const op = g.ops[i]
+
+  let merged
+  if (isParen(a)) merged = pushIntoParen(a, op, b)
+  else if (isParen(b)) merged = pushIntoParen(b, '*', a, true)
+  else {
+    const mul = op === '*'
+    const coef = mul ? rMul(a.coef, b.coef) : rDiv(a.coef, b.coef)
+    const powers = {}
+    for (const s of SYMBOLS) {
+      const k = (a.powers[s] || 0) + (mul ? 1 : -1) * (b.powers[s] || 0)
+      if (k) powers[s] = k
+    }
+    merged = makeTerm(coef, powers)
+  }
+
   return normalizeGroup({
     ...g,
-    factors: [...g.factors.slice(0, i), makeFactor(coef, power), ...g.factors.slice(i + 2)],
+    factors: [...g.factors.slice(0, i), merged, ...g.factors.slice(i + 2)],
     ops: [...g.ops.slice(0, i), ...g.ops.slice(i + 1)],
   })
+}
+
+/**
+ * A bracket with nothing left holding it together opens by itself: once the
+ * `/c` beside `(a + b)` has cancelled, there is no bracket left to draw, so
+ * `(a + b) + d` becomes `a + b + d`. A minus in front flips every sign inside.
+ */
+export function openParens(side) {
+  let changed = false
+  const out = []
+  for (const g of side) {
+    if (g.factors.length === 1 && isParen(g.factors[0])) {
+      changed = true
+      for (const h of g.factors[0].paren) {
+        out.push({ ...h, id: uid('g'), sign: g.sign === '-' ? flip(h.sign) : h.sign })
+      }
+    } else out.push(g)
+  }
+  return changed ? out : side
 }
 
 // ---------------------------------------------------------------- groups
 
 /**
  * Can the + or - in front of group i be carried out against group i-1?
- * Both must be a single factor (so pending * and / happen first) and must be
- * like terms - "3x + 7" stays put, which is the point of the exercise.
+ * Both must be a single plain factor (so pending * and / happen first) and
+ * must be like terms - "3x + 7" stays put, which is the point of the exercise.
  */
 export function canCombineGroups(side, i) {
   if (i <= 0 || i >= side.length) return false
   const a = side[i - 1]
   const b = side[i]
   if (a.factors.length !== 1 || b.factors.length !== 1) return false
-  return a.factors[0].power === b.factors[0].power
+  if (isParen(a.factors[0]) || isParen(b.factors[0])) return false
+  return powersKey(a.factors[0].powers) === powersKey(b.factors[0].powers)
 }
 
 export function combineGroups(side, i) {
   if (!canCombineGroups(side, i)) return side
   const value = rAdd(signedCoef(side[i - 1]), signedCoef(side[i]))
-  const { power } = side[i - 1].factors[0]
+  const { powers } = side[i - 1].factors[0]
   const rest = [...side.slice(0, i - 1), ...side.slice(i + 1)]
   // Terms that cancel disappear, unless they were all that was left
   if (rIsZero(value)) return rest.length ? rest : [constGroup(0)]
-  const merged = makeGroup(rSign(value) < 0 ? '-' : '+', [makeFactor(rAbs(value), power)])
+  const merged = makeGroup(rSign(value) < 0 ? '-' : '+', [makeTerm(rAbs(value), powers)])
   return [...side.slice(0, i - 1), merged, ...side.slice(i + 1)]
 }
 
@@ -186,6 +307,53 @@ export function moveGroup(side, from, to) {
 /** A lone term has nowhere to go, so "49" can't be dragged until it has company. */
 export const canDrag = (side) => side.length > 1
 
+// ---------------------------------------------------------------- substituting
+
+/** Every place on a side where `sym` appears on its own first power. */
+export function substitutionSpots(side, sym) {
+  const spots = []
+  side.forEach((g, gi) => {
+    if (g.factors.length !== 1) return
+    const f = g.factors[0]
+    if (!isParen(f) && f.powers[sym] === 1) spots.push({ group: gi, factor: 0 })
+  })
+  return spots
+}
+
+/**
+ * Put an expression in place of one letter. Whatever was multiplying the
+ * letter stays in front as its own factor, so replacing x in `7x` with
+ * `3y + 5` reads as `7 * 3y + 7 * 5` - the multiplying out is left for the
+ * student, which is the whole point of the step.
+ */
+export function substitute(side, gi, sym, expr) {
+  const g = side[gi]
+  if (!g || g.factors.length !== 1) return side
+  const f = g.factors[0]
+  if (isParen(f) || f.powers[sym] !== 1) return side
+
+  const rest = makeTerm(f.coef, { ...f.powers, [sym]: 0 })
+  // `x` itself, with nothing multiplying it, needs no factor left in front.
+  const bare = rIsOne(rest.coef) && powersKey(rest.powers) === ''
+
+  const built = expr.map((h) => {
+    const inner = h.factors.map(recopy)
+    // A minus inside the expression rides on the number rather than on the
+    // group, so substituting -2 shows as `3 * -2` and not `- 3 * 2`.
+    if (!bare && h.sign === '-' && !isParen(inner[0])) {
+      inner[0] = makeTerm(rNeg(inner[0].coef), inner[0].powers)
+    }
+    return {
+      id: uid('g'),
+      sign: bare ? (g.sign === '-' ? flip(h.sign) : h.sign) : g.sign,
+      factors: bare ? inner : [recopy(rest), ...inner],
+      ops: bare ? [...h.ops] : ['*', ...h.ops],
+    }
+  })
+
+  return [...side.slice(0, gi), ...built, ...side.slice(gi + 1)]
+}
+
 // ---------------------------------------------------------------- operations
 
 /**
@@ -194,18 +362,18 @@ export const canDrag = (side) => side.length > 1
  */
 export function applyToSide(side, kind, operand) {
   if (kind === 'add' || kind === 'sub') {
-    let { coef, power } = operand
+    let { coef } = operand
     let sign = kind === 'add' ? '+' : '-'
     if (rSign(coef) < 0) {
       coef = rAbs(coef)
       sign = sign === '+' ? '-' : '+' // "+ -3" reads as "- 3"
     }
-    return [...side, makeGroup(sign, [makeFactor(coef, power)])]
+    return [...side, makeGroup(sign, [makeTerm(coef, operand.powers)])]
   }
   const op = kind === 'mul' ? '*' : '/'
   return side.map((g) => ({
     ...g,
-    factors: [...g.factors, makeFactor(operand.coef, operand.power)],
+    factors: [...g.factors, makeTerm(operand.coef, operand.powers)],
     ops: [...g.ops, op],
   }))
 }
@@ -227,15 +395,17 @@ function parseNumber(s) {
 }
 
 /**
- * Accepts "7", "-3", "x", "2x", "1.5", "3/4", "3/4x", "x^2", "2x^3", and a
- * divisor written after the x rather than before it: "x/2", "3x/2", "x^2/3".
+ * One term, read strictly left to right: "7", "-3", "x", "2x", "1.5", "3/4",
+ * "x^2", "2x^3", "ce", "c*e", "a/c", and a divisor written after the letter
+ * rather than before it: "x/2", "3x/2", "28y/27".
  *
- * A trailing divisor belongs to the coefficient, so "3x/2" and "3/2x" are the
- * same thing - three halves of x, not three x's over something else.
+ * Left to right is what makes "3x/2" and "3/2x" the same thing - three halves
+ * of x, not three x's over something else.
  */
 export function parseOperand(text) {
-  let t = String(text).trim().replace(/\s+/g, '')
+  let t = String(text).trim().replace(/\s+/g, '').toLowerCase()
   if (!t) return null
+
   let negative = false
   if (t[0] === '+') t = t.slice(1)
   else if (t[0] === '-') {
@@ -243,43 +413,47 @@ export function parseOperand(text) {
     t = t.slice(1)
   }
 
-  const xi = t.indexOf('x')
-  if (xi < 0) {
-    const plain = parseNumber(t)
-    if (!plain) return null
-    return { coef: negative ? rNeg(plain) : plain, power: 0 }
+  let coef = num(1)
+  const powers = {}
+  let op = '*'
+  let read = false
+
+  while (t) {
+    let m
+    if ((m = t.match(/^[*/]/))) {
+      op = m[0]
+      t = t.slice(1)
+      continue
+    }
+    if ((m = t.match(/^\d+(?:\.\d+)?/))) {
+      const v = ratFromDecimal(parseFloat(m[0]))
+      if (op === '*') coef = rMul(coef, v)
+      else {
+        if (rIsZero(v)) return null
+        coef = rDiv(coef, v)
+      }
+      t = t.slice(m[0].length)
+      op = '*'
+      read = true
+      continue
+    }
+    if ((m = t.match(/^([a-z])(?:\^(\d+))?/))) {
+      if (!SYMBOL_ORDER.has(m[1])) return null
+      const p = m[2] ? parseInt(m[2], 10) : 1
+      powers[m[1]] = (powers[m[1]] || 0) + (op === '*' ? p : -p)
+      t = t.slice(m[0].length)
+      op = '*'
+      read = true
+      continue
+    }
+    return null
   }
 
-  // [number] x [^power] [/divisor]
-  const numPart = t.slice(0, xi)
-  let rest = t.slice(xi + 1)
-  let power = 1
-
-  if (rest.startsWith('^')) {
-    const digits = rest.slice(1).match(/^\d+/)
-    if (!digits) return null
-    power = parseInt(digits[0], 10)
-    rest = rest.slice(1 + digits[0].length)
-  }
-
-  let divisor = null
-  if (rest.startsWith('/')) {
-    divisor = parseNumber(rest.slice(1))
-    if (!divisor || rIsZero(divisor)) return null
-    rest = ''
-  }
-  if (rest !== '') return null
-
-  let coef = numPart === '' ? num(1) : parseNumber(numPart)
-  if (!coef) return null
-  if (divisor) {
-    coef = rDiv(coef, divisor)
-    if (!coef) return null
-  }
-  return { coef: negative ? rNeg(coef) : coef, power }
+  if (!read) return null
+  return { coef: negative ? rNeg(coef) : coef, powers: cleanPowers(powers) }
 }
 
-function parseSide(text) {
+export function parseSide(text) {
   const t = String(text).trim().replace(/\s+/g, '')
   if (!t) return null
   const tokens = t.match(/[+-]?[^+-]+/g)
@@ -300,7 +474,7 @@ function parseSide(text) {
       coef = rAbs(coef)
       sign = sign === '+' ? '-' : '+'
     }
-    groups.push(makeGroup(sign, [makeFactor(coef, f.power)]))
+    groups.push(makeGroup(sign, [makeTerm(coef, f.powers)]))
   }
   return groups
 }
@@ -317,29 +491,103 @@ export function parseEquation(text) {
 
 // ---------------------------------------------------------------- solving
 
-const isBareX = (side) =>
+/**
+ * A side boiled down to `powers key -> term`, with like terms added up. This
+ * is what makes an answer order-blind: `ce - cd - a` and `-a + ce - cd` reduce
+ * to exactly the same map, so both are marked right.
+ *
+ * null if anything is still bracketed or still waiting to be multiplied out.
+ */
+export function canonical(side) {
+  const out = new Map()
+  for (const g of side) {
+    if (g.factors.length !== 1) return null
+    const f = g.factors[0]
+    if (isParen(f)) return null
+    const key = powersKey(f.powers)
+    const coef = g.sign === '-' ? rNeg(f.coef) : f.coef
+    const seen = out.get(key)
+    out.set(key, { powers: f.powers, coef: seen ? rAdd(seen.coef, coef) : coef })
+  }
+  for (const [k, v] of out) if (rIsZero(v.coef)) out.delete(k)
+  return out
+}
+
+export function canonEq(a, b) {
+  if (!a || !b || a.size !== b.size) return false
+  for (const [k, v] of a) {
+    const w = b.get(k)
+    if (!w || !rEq(v.coef, w.coef)) return false
+  }
+  return true
+}
+
+/** The canonical form of an answer written out longhand, e.g. "8 - 10y". */
+export function expr(text) {
+  const side = parseSide(text)
+  return side ? canonical(side) : null
+}
+
+/**
+ * True when there is nothing left on this side that could still be clicked:
+ * every group is one plain factor, and no two of them are like terms.
+ * "-6 + 5" is not finished, even though it is perfectly readable.
+ */
+export function isCollapsed(side) {
+  const seen = new Set()
+  for (const g of side) {
+    if (g.factors.length !== 1 || isParen(g.factors[0])) return false
+    const key = powersKey(g.factors[0].powers)
+    if (seen.has(key)) return false
+    seen.add(key)
+  }
+  return true
+}
+
+const isBareSym = (side, sym) =>
   side.length === 1 &&
   side[0].factors.length === 1 &&
   side[0].sign === '+' &&
-  side[0].factors[0].power === 1 &&
-  rIsOne(side[0].factors[0].coef)
+  !isParen(side[0].factors[0]) &&
+  rIsOne(side[0].factors[0].coef) &&
+  powersKey(side[0].factors[0].powers) === `${sym}^1`
 
-const loneConst = (side) =>
-  side.length === 1 && side[0].factors.length === 1 && side[0].factors[0].power === 0
-    ? signedCoef(side[0])
-    : null
+/**
+ * What `sym` works out to once the equation reads "sym = ...", as a canonical
+ * map, or null. The other side has to be finished and must not mention `sym`
+ * itself, so "x = 2x - 8" does not count as solved.
+ */
+export function solvedExpr(eq, sym = 'x') {
+  for (const [bare, value] of [['left', 'right'], ['right', 'left']]) {
+    if (!isBareSym(eq[bare], sym)) continue
+    if (!isCollapsed(eq[value])) continue
+    const c = canonical(eq[value])
+    if (!c) continue
+    if ([...c.values()].some((v) => v.powers[sym])) continue
+    return c
+  }
+  return null
+}
+
+/**
+ * The groups on the far side of a solved "sym = ...", ready to be dropped into
+ * another equation in place of that letter. null while it is not solved.
+ */
+export function solutionSide(eq, sym = 'x') {
+  for (const [bare, value] of [['left', 'right'], ['right', 'left']]) {
+    if (isBareSym(eq[bare], sym) && isCollapsed(eq[value])) return eq[value]
+  }
+  return null
+}
 
 /** The value of x once the equation reads "x = n" (either way round), else null. */
 export function solvedValue(eq) {
-  if (isBareX(eq.left)) {
-    const v = loneConst(eq.right)
-    if (v !== null) return v
-  }
-  if (isBareX(eq.right)) {
-    const v = loneConst(eq.left)
-    if (v !== null) return v
-  }
-  return null
+  const c = solvedExpr(eq, 'x')
+  if (!c) return null
+  if (c.size === 0) return num(0) // everything cancelled: x = 0
+  if (c.size !== 1) return null
+  const [only] = [...c.values()]
+  return powersKey(only.powers) === '' ? only.coef : null
 }
 
 // ---------------------------------------------------------------- puzzles
@@ -400,9 +648,10 @@ export function makePuzzles(rand = Math.random) {
 }
 
 /**
- * The bonus problem that closes the unit: 4/(3x) + 9 = 37, with x underneath.
- * A power of -1 is what puts it there. Take 9 off both sides for 4/(3x) = 28,
- * multiply both sides by x to bring it up as 4/3 = 28x, then divide by 28.
+ * The bonus problem that closes "Solve that Equation!": 4/(3x) + 9 = 37, with
+ * x underneath. A power of -1 is what puts it there. Take 9 off both sides for
+ * 4/(3x) = 28, multiply both sides by x to bring it up as 4/3 = 28x, then
+ * divide by 28.
  */
 export const bonusEquation = () => ({
   eq: {
@@ -491,9 +740,10 @@ export function counterStacks(value, perUnit) {
 // ---------------------------------------------------------------- stages
 
 /**
- * The unit in order: four equations, the three word problems, then the bonus.
- * Every stage carries the answer it is supposed to reach, so working that ends
- * somewhere else can be turned away instead of quietly counting as a pass.
+ * "Solve that Equation!" in order: four equations, the three word problems,
+ * then the bonus. Every stage carries the answer it is supposed to reach, so
+ * working that ends somewhere else can be turned away instead of quietly
+ * counting as a pass.
  */
 export function makeStages(rand = Math.random) {
   const puzzles = makePuzzles(rand)

@@ -1,22 +1,27 @@
 import { useCallback, useRef, useState } from 'react'
 import './App.css'
 import BackButton from './BackButton.jsx'
+import MoreVariables from './algebra/MoreVariables.jsx'
 import SolveThatEquation from './algebra/SolveThatEquation.jsx'
+import SandTemple from './temples/SandTemple.jsx'
 import StoneTemple from './temples/StoneTemple.jsx'
 import { applyCode, grantReward, hardWrite, loadSave, persist } from './save.js'
 
 /** Units that have real content, keyed by their name on the Algebra screen. */
 const UNIT_SCREENS = {
   'Solve that Equation!': SolveThatEquation,
+  'More Variables': MoreVariables,
 }
 
 /**
  * Temples are earned, not listed: the Temples screen shows only the ones whose
  * id is in the unlocked set. The Stone Temple comes from the bonus problem at
- * the end of "Solve that Equation!".
+ * the end of "Solve that Equation!", and the Sand Temple from the one at the
+ * end of "More Variables".
  */
 const TEMPLES = [
   { id: 'stone', name: 'Stone Temple', screen: StoneTemple },
+  { id: 'sand', name: 'Sand Temple', screen: SandTemple },
 ]
 
 /**

@@ -2,19 +2,21 @@ import { useEffect, useReducer, useRef } from 'react'
 import BackButton from '../BackButton.jsx'
 import EquationView from '../algebra/EquationView.jsx'
 import {
+  BAGS, cloneInventory, Hearts, makeInventory, restoreInventory, Slot,
+} from './Kit.jsx'
+import {
   applyOperation, isCorrect, keypadEquation, parseOperand, ratText, solvedValue,
 } from '../algebra/equation.js'
 import { chestReward } from '../save.js'
 import {
   ACID_IMPACT_DAMAGE, ACID_TICK, ACID_TICK_DAMAGE, addToSlots, angleDiff,
-  ARMOR_SLOTS, BITE_ARC, BITE_COOLDOWN, BITE_DAMAGE, BITE_REACH, BLOCK,
+  BITE_ARC, BITE_COOLDOWN, BITE_DAMAGE, BITE_REACH, BLOCK,
   blocked, boltLanding, BOSS_ROOM, boxHits, buildWorld, BUTTONS, canPlace,
   CHEST, CHEST_RANGE, CONSOLE_RANGE, CONSOLES, distToBox,
-  CRAFT_SLOTS, DOOR, DOOR_SPLIT, DOOR_TIME, GARGOYLE_HOME, GARGOYLE_HP,
+  DOOR, DOOR_SPLIT, DOOR_TIME, GARGOYLE_HOME, GARGOYLE_HP,
   GARGOYLE_REACH, GARGOYLE_SIZE, GARGOYLE_SPEED, gargoylePhase, GROUND_ITEMS,
-  HEART_COUNT,
-  heartFill, HOTBAR_SLOTS, HURT_INVULN, inPuddle, inRect, inReach,
-  INVENTORY_SLOTS, isPlaceable, isStaff, isSword, ITEMS, JUMP_TIME, key,
+  HURT_INVULN, inPuddle, inRect, inReach,
+  isPlaceable, isStaff, isSword, JUMP_TIME, key,
   landingSpot,
   MAIN_ROOM, MAX_DIGITS, MAX_HEALTH, MINE_SECONDS, openDoor, OP_KINDS, overVoid,
   PAD_RANGE, petrifyTargets,
@@ -35,154 +37,9 @@ const FALL_TIME = 0.55
 const OPS = OP_KINDS
 const opSymbol = (kind) => OPS.find((o) => o.kind === kind)?.symbol ?? '?'
 
-const BAGS = ['hotbar', 'main', 'armor', 'craft', 'acorn']
-
-/** An empty bag, or the one you walked out of here with last time. */
-function makeInventory(saved) {
-  const inv = {
-    hotbar: Array(HOTBAR_SLOTS).fill(null),
-    main: Array(INVENTORY_SLOTS).fill(null),
-    armor: Array(ARMOR_SLOTS).fill(null),
-    craft: Array(CRAFT_SLOTS).fill(null),
-    // A one-slot array, so it drags and drops like every other slot.
-    acorn: [null],
-    selected: 0,
-  }
-  if (saved) {
-    for (const bag of BAGS) {
-      const src = saved[bag]
-      if (!Array.isArray(src)) continue
-      src.forEach((slot, i) => {
-        if (i < inv[bag].length) inv[bag][i] = slot ? { ...slot } : null
-      })
-    }
-  }
-  // The acorn was in the bag before any of this started, and stays there.
-  if (!inv.acorn[0]) inv.acorn[0] = stack('acorn', 1)
-  return inv
-}
-
-const cloneInventory = (inv) =>
-  Object.fromEntries(BAGS.map((bag) => [bag, inv[bag].map((s) => (s ? { ...s } : null))]))
-
-/** Put a bag back exactly as it was, in place - everything holds a reference. */
-function restoreInventory(inv, snapshot) {
-  for (const bag of BAGS) {
-    for (let i = 0; i < inv[bag].length; i++) {
-      const slot = snapshot[bag]?.[i]
-      inv[bag][i] = slot ? { ...slot } : null
-    }
-  }
-  inv.selected = 0
-}
-
 /** Each tablet keeps its own half-built instruction. */
 const emptyPads = () =>
   Object.fromEntries(CONSOLES.map((c) => [c.id, { op: null, digits: '' }]))
-
-// ---------------------------------------------------------------- item icons
-
-function SwordIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="slot-icon" aria-hidden="true">
-      <path d="M11 2h3v3l-6 6-3-3 6-6z" fill="#9aa3ad" />
-      <path d="M11 2h3v3l-1.5 1.5-3-3L11 2z" fill="#c6ced6" />
-      <path d="M4 9l3 3-1 1-3-3 1-1z" fill="#6b4a2a" />
-      <path d="M2 11l3 3-1 1-3-3 1-1z" fill="#4a2f18" />
-    </svg>
-  )
-}
-
-function CobbleIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="slot-icon" aria-hidden="true">
-      <rect width="16" height="16" fill="#7b7f88" />
-      <rect x="1" y="1" width="6" height="5" fill="#9aa0aa" />
-      <rect x="9" y="2" width="5" height="4" fill="#666b74" />
-      <rect x="2" y="8" width="4" height="6" fill="#666b74" />
-      <rect x="8" y="8" width="6" height="3" fill="#9aa0aa" />
-      <rect x="8" y="12" width="4" height="2" fill="#8a8f99" />
-    </svg>
-  )
-}
-
-function StoneIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="slot-icon" aria-hidden="true">
-      <rect width="16" height="16" fill="#8d919a" />
-      <rect x="2" y="3" width="5" height="3" fill="#7a7e87" />
-      <rect x="10" y="7" width="4" height="4" fill="#7a7e87" />
-      <rect x="4" y="11" width="5" height="2" fill="#9ea2ab" />
-    </svg>
-  )
-}
-
-function StaffIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="slot-icon" aria-hidden="true">
-      <path d="M4 14l7-8 1 1-7 8-1-1z" fill="#6b4a2a" />
-      <path d="M9 1l3 1 1 3-2 2-3-1-1-3 2-2z" fill="#8d919a" />
-      <path d="M10 3l2 .7.4 2-1.4 1.3-2-.7-.4-2L10 3z" fill="#c6ced6" />
-    </svg>
-  )
-}
-
-function AcornIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="slot-icon" aria-hidden="true">
-      <path d="M4 7c0 4 1.8 7 4 7s4-3 4-7H4z" fill="#c07b3a" />
-      <path d="M3 4h10v3H3z" fill="#6b4423" />
-      <rect x="7" y="1" width="2" height="3" fill="#6b4423" />
-    </svg>
-  )
-}
-
-const ICONS = {
-  sword: SwordIcon,
-  cobblestone: CobbleIcon,
-  stone: StoneIcon,
-  staff: StaffIcon,
-  acorn: AcornIcon,
-}
-
-function Slot({ item, selected, held, over, label, ...rest }) {
-  const Icon = item ? ICONS[item.kind] : null
-  return (
-    <button
-      type="button"
-      className={
-        'slot' +
-        (selected ? ' slot--on' : '') +
-        (held ? ' slot--held' : '') +
-        (over ? ' slot--over' : '')
-      }
-      title={item ? ITEMS[item.kind]?.name : label || 'Empty'}
-      {...rest}
-    >
-      {Icon && <Icon />}
-      {item && item.count > 1 && <span className="slot-count">{item.count}</span>}
-    </button>
-  )
-}
-
-/** Ten hearts, emptying from the right, each one worth two health. */
-function Hearts({ health }) {
-  return (
-    <div className="hearts">
-      {Array.from({ length: HEART_COUNT }, (_, i) => {
-        const fill = heartFill(i, health)
-        return (
-          <span
-            key={i}
-            className={
-              'heart' + (fill === 1 ? ' heart--full' : fill === 0.5 ? ' heart--half' : '')
-            }
-          />
-        )
-      })}
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------- the temple
 
@@ -229,7 +86,6 @@ export default function StoneTemple({ onBack, onReward, onStash, save }) {
       world: null,
       blocks: null, // "x,y" -> 'cobblestone' | 'stone'
       player: {},
-      checkpoint: null,
       ground: null,
       keys: new Set(),
       mouse: { x: SPAWN.x, y: SPAWN.y, down: false },
@@ -405,7 +261,6 @@ export default function StoneTemple({ onBack, onReward, onStash, save }) {
         invuln: HURT_INVULN * 2,
         acidTick: 0,
       })
-      game.checkpoint = { ...SPAWN }
       game.ground = GROUND_ITEMS.map((g) => ({ ...g, item: { ...g.item } }))
       game.zombies = []
       game.shots = []
@@ -645,15 +500,10 @@ export default function StoneTemple({ onBack, onReward, onStash, save }) {
       const p = game.player
       if (p.invuln > 0) p.invuln = Math.max(0, p.invuln - dt)
 
+      // A ravine is not a setback. Whatever is down there, nobody climbs out.
       if (p.falling > 0) {
         p.falling += dt
-        if (p.falling >= FALL_TIME) {
-          p.x = game.checkpoint.x
-          p.y = game.checkpoint.y
-          p.falling = 0
-          p.airborne = false
-          p.jumpT = 0
-        }
+        if (p.falling >= FALL_TIME) die()
         return
       }
 
@@ -713,10 +563,7 @@ export default function StoneTemple({ onBack, onReward, onStash, save }) {
         }
       }
 
-      if (!p.airborne) {
-        if (overVoid(game.world, game.blocks, p.x, p.y)) p.falling = 0.0001
-        else game.checkpoint = { x: p.x, y: p.y }
-      }
+      if (!p.airborne && overVoid(game.world, game.blocks, p.x, p.y)) p.falling = 0.0001
 
       for (const g of [...game.ground]) {
         if (Math.hypot(g.x + 0.5 - p.x, g.y + 0.5 - p.y) < PICKUP_RANGE) pickUp(g)
